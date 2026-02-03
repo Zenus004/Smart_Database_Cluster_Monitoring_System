@@ -1,3 +1,0 @@
-CREATE USER 'replicator'@'%' IDENTIFIED BY 'password123';
-GRANT REPLICATION SLAVE ON *.* TO 'replicator'@'%';
-FLUSH PRIVILEGES;

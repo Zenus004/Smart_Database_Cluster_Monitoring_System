@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ---------------------------------------
   # PostgreSQL Cluster (Master + 2 Replicas)
@@ -7,52 +5,73 @@ services:
   postgres-master:
     image: postgres:15-alpine
     container_name: postgres-master
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password123
-      POSTGRES_DB: monitoring_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - ./config/postgres/master.conf:/etc/postgresql/postgresql.conf
-      - ./config/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
       - pg_master_data:/var/lib/postgresql/data
-      - ./scripts/init-pg-master.sh:/docker-entrypoint-initdb.d/init-replica-user.sh
-    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+      - ./config/postgres/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./config/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
+      - ./scripts/init-pg-master.sh:/docker-entrypoint-initdb.d/init.sh
+    command: >
+      postgres -c config_file=/etc/postgresql/postgresql.conf
+             -c hba_file=/etc/postgresql/pg_hba.conf
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:5432"
     networks:
       - db-cluster-net
 
   postgres-replica-1:
     image: postgres:15-alpine
     container_name: postgres-replica-1
+    user: postgres
+    restart: unless-stopped
     depends_on:
       - postgres-master
     environment:
-      PGPASSWORD: password123
+      PGPASSWORD: ${REPLICATOR_PASSWORD}
     volumes:
       - ./config/postgres/replica.conf:/etc/postgresql/postgresql.conf
       - pg_replica1_data:/var/lib/postgresql/data
     command: >
-      bash -c "rm -rf /var/lib/postgresql/data/* &&
-      pg_basebackup -h postgres-master -D /var/lib/postgresql/data -U replicator -v -P -X stream &&
-      postgres -c config_file=/etc/postgresql/postgresql.conf"
+      bash -c "
+      until pg_isready -h postgres-master -p 5432; do sleep 2; done &&
+      rm -rf /var/lib/postgresql/data/* &&
+      pg_basebackup -h postgres-master -D /var/lib/postgresql/data -U ${REPLICATOR_USER} -v -P -X stream -R &&
+      chown -R postgres:postgres /var/lib/postgresql/data &&
+      chmod 700 /var/lib/postgresql/data &&
+      postgres
+      "
+    ports:
+      - "5435:5432"
     networks:
       - db-cluster-net
 
   postgres-replica-2:
     image: postgres:15-alpine
     container_name: postgres-replica-2
+    user: postgres
+    restart: unless-stopped
     depends_on:
       - postgres-master
     environment:
-      PGPASSWORD: password123
+      PGPASSWORD: ${REPLICATOR_PASSWORD}
     volumes:
       - ./config/postgres/replica.conf:/etc/postgresql/postgresql.conf
       - pg_replica2_data:/var/lib/postgresql/data
     command: >
-      bash -c "rm -rf /var/lib/postgresql/data/* &&
-      pg_basebackup -h postgres-master -D /var/lib/postgresql/data -U replicator -v -P -X stream &&
-      postgres -c config_file=/etc/postgresql/postgresql.conf"
+      bash -c "
+      until pg_isready -h postgres-master -p 5432; do sleep 2; done &&
+      rm -rf /var/lib/postgresql/data/* &&
+      pg_basebackup -h postgres-master -D /var/lib/postgresql/data -U ${REPLICATOR_USER} -v -P -X stream -R &&
+      chown -R postgres:postgres /var/lib/postgresql/data &&
+      chmod 700 /var/lib/postgresql/data &&
+      postgres
+      "
+    ports:
+      - "5436:5432"
     networks:
       - db-cluster-net
 
@@ -62,43 +81,52 @@ services:
   mysql-master:
     image: mysql:8.0
     container_name: mysql-master
+    restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: password123
-      MYSQL_DATABASE: monitoring_db
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      REPLICATOR_USER: ${REPLICATOR_USER}
+      REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD}
     volumes:
       - ./config/mysql/master.cnf:/etc/mysql/conf.d/config.cnf
       - mysql_master_data:/var/lib/mysql
-      - ./scripts/init-mysql-master.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./scripts/init-mysql-master.sh:/docker-entrypoint-initdb.d/init.sh
     ports:
-      - "3306:3306"
+      - "${MYSQL_PORT}:3306"
     networks:
       - db-cluster-net
 
   mysql-slave-1:
     image: mysql:8.0
     container_name: mysql-slave-1
+    restart: unless-stopped
     depends_on:
       - mysql-master
     environment:
-      MYSQL_ROOT_PASSWORD: password123
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     volumes:
       - ./config/mysql/slave.cnf:/etc/mysql/conf.d/config.cnf
       - mysql_slave1_data:/var/lib/mysql
     command: --server-id=2
+    ports:
+      - "3309:3306"
     networks:
       - db-cluster-net
 
   mysql-slave-2:
     image: mysql:8.0
     container_name: mysql-slave-2
+    restart: unless-stopped
     depends_on:
       - mysql-master
     environment:
-      MYSQL_ROOT_PASSWORD: password123
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     volumes:
       - ./config/mysql/slave.cnf:/etc/mysql/conf.d/config.cnf
       - mysql_slave2_data:/var/lib/mysql
     command: --server-id=3
+    ports:
+      - "3310:3306"
     networks:
       - db-cluster-net
 
@@ -108,16 +136,18 @@ services:
   backend:
     build: ./backend
     container_name: monitoring-backend
+    restart: unless-stopped
     volumes:
       - ./backend:/app
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
-      - "4000:4000"
+      - "${BACKEND_PORT}:4000"
     depends_on:
       - postgres-master
       - mysql-master
     networks:
       - db-cluster-net
+
 
   # ---------------------------------------
   # Frontend Dashboard
