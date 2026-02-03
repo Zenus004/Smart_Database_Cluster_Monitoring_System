@@ -1,0 +1,145 @@
+version: '3.8'
+
+services:
+  # ---------------------------------------
+  # PostgreSQL Cluster (Master + 2 Replicas)
+  # ---------------------------------------
+  postgres-master:
+    image: postgres:15-alpine
+    container_name: postgres-master
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: monitoring_db
+    volumes:
+      - ./config/postgres/master.conf:/etc/postgresql/postgresql.conf
+      - ./config/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
+      - pg_master_data:/var/lib/postgresql/data
+      - ./scripts/init-pg-master.sh:/docker-entrypoint-initdb.d/init-replica-user.sh
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    ports:
+      - "5432:5432"
+    networks:
+      - db-cluster-net
+
+  postgres-replica-1:
+    image: postgres:15-alpine
+    container_name: postgres-replica-1
+    depends_on:
+      - postgres-master
+    environment:
+      PGPASSWORD: password123
+    volumes:
+      - ./config/postgres/replica.conf:/etc/postgresql/postgresql.conf
+      - pg_replica1_data:/var/lib/postgresql/data
+    command: >
+      bash -c "rm -rf /var/lib/postgresql/data/* &&
+      pg_basebackup -h postgres-master -D /var/lib/postgresql/data -U replicator -v -P -X stream &&
+      postgres -c config_file=/etc/postgresql/postgresql.conf"
+    networks:
+      - db-cluster-net
+
+  postgres-replica-2:
+    image: postgres:15-alpine
+    container_name: postgres-replica-2
+    depends_on:
+      - postgres-master
+    environment:
+      PGPASSWORD: password123
+    volumes:
+      - ./config/postgres/replica.conf:/etc/postgresql/postgresql.conf
+      - pg_replica2_data:/var/lib/postgresql/data
+    command: >
+      bash -c "rm -rf /var/lib/postgresql/data/* &&
+      pg_basebackup -h postgres-master -D /var/lib/postgresql/data -U replicator -v -P -X stream &&
+      postgres -c config_file=/etc/postgresql/postgresql.conf"
+    networks:
+      - db-cluster-net
+
+  # ---------------------------------------
+  # MySQL Cluster (Master + 2 Slaves)
+  # ---------------------------------------
+  mysql-master:
+    image: mysql:8.0
+    container_name: mysql-master
+    environment:
+      MYSQL_ROOT_PASSWORD: password123
+      MYSQL_DATABASE: monitoring_db
+    volumes:
+      - ./config/mysql/master.cnf:/etc/mysql/conf.d/config.cnf
+      - mysql_master_data:/var/lib/mysql
+      - ./scripts/init-mysql-master.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "3306:3306"
+    networks:
+      - db-cluster-net
+
+  mysql-slave-1:
+    image: mysql:8.0
+    container_name: mysql-slave-1
+    depends_on:
+      - mysql-master
+    environment:
+      MYSQL_ROOT_PASSWORD: password123
+    volumes:
+      - ./config/mysql/slave.cnf:/etc/mysql/conf.d/config.cnf
+      - mysql_slave1_data:/var/lib/mysql
+    command: --server-id=2
+    networks:
+      - db-cluster-net
+
+  mysql-slave-2:
+    image: mysql:8.0
+    container_name: mysql-slave-2
+    depends_on:
+      - mysql-master
+    environment:
+      MYSQL_ROOT_PASSWORD: password123
+    volumes:
+      - ./config/mysql/slave.cnf:/etc/mysql/conf.d/config.cnf
+      - mysql_slave2_data:/var/lib/mysql
+    command: --server-id=3
+    networks:
+      - db-cluster-net
+
+  # ---------------------------------------
+  # Backend API
+  # ---------------------------------------
+  backend:
+    build: ./backend
+    container_name: monitoring-backend
+    volumes:
+      - ./backend:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "4000:4000"
+    depends_on:
+      - postgres-master
+      - mysql-master
+    networks:
+      - db-cluster-net
+
+  # ---------------------------------------
+  # Frontend Dashboard
+  # ---------------------------------------
+#  frontend:
+#    build: ./frontend
+#    container_name: monitoring-frontend
+#    volumes:
+#      - ./frontend:/app
+#    ports:
+#      - "3000:3000"
+#    networks:
+#      - db-cluster-net
+
+networks:
+  db-cluster-net:
+    driver: bridge
+
+volumes:
+  pg_master_data:
+  pg_replica1_data:
+  pg_replica2_data:
+  mysql_master_data:
+  mysql_slave1_data:
+  mysql_slave2_data:

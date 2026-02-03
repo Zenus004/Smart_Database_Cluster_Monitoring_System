@@ -1,0 +1,9 @@
+[mysqld]
+server-id=2
+relay-log=mysql-relay-bin
+log-bin=mysql-bin
+binlog_format=row
+datadir=/var/lib/mysql
+socket=/var/run/mysqld/mysqld.sock
+bind-address=0.0.0.0
+read_only=1
