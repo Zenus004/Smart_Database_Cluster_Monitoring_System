@@ -34,6 +34,7 @@ services:
       PGPASSWORD: ${REPLICATOR_PASSWORD}
     volumes:
       - ./config/postgres/replica.conf:/etc/postgresql/postgresql.conf
+      - ./config/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
       - pg_replica1_data:/var/lib/postgresql/data
     command: >
       bash -c "
@@ -42,7 +43,7 @@ services:
       pg_basebackup -h postgres-master -D /var/lib/postgresql/data -U ${REPLICATOR_USER} -v -P -X stream -R &&
       chown -R postgres:postgres /var/lib/postgresql/data &&
       chmod 700 /var/lib/postgresql/data &&
-      postgres
+      postgres -c config_file=/etc/postgresql/postgresql.conf -c hba_file=/etc/postgresql/pg_hba.conf
       "
     ports:
       - "5435:5432"
@@ -60,6 +61,7 @@ services:
       PGPASSWORD: ${REPLICATOR_PASSWORD}
     volumes:
       - ./config/postgres/replica.conf:/etc/postgresql/postgresql.conf
+      - ./config/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
       - pg_replica2_data:/var/lib/postgresql/data
     command: >
       bash -c "
@@ -68,7 +70,7 @@ services:
       pg_basebackup -h postgres-master -D /var/lib/postgresql/data -U ${REPLICATOR_USER} -v -P -X stream -R &&
       chown -R postgres:postgres /var/lib/postgresql/data &&
       chmod 700 /var/lib/postgresql/data &&
-      postgres
+      postgres -c config_file=/etc/postgresql/postgresql.conf -c hba_file=/etc/postgresql/pg_hba.conf
       "
     ports:
       - "5436:5432"
@@ -90,7 +92,7 @@ services:
     volumes:
       - ./config/mysql/master.cnf:/etc/mysql/conf.d/config.cnf
       - mysql_master_data:/var/lib/mysql
-      - ./scripts/init-mysql-master.sh:/docker-entrypoint-initdb.d/init.sh
+      - ./scripts/init-mysql-master.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "${MYSQL_PORT}:3306"
     networks:
@@ -104,9 +106,11 @@ services:
       - mysql-master
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
     volumes:
       - ./config/mysql/slave.cnf:/etc/mysql/conf.d/config.cnf
       - mysql_slave1_data:/var/lib/mysql
+      - ./scripts/init-mysql-slave.sh:/docker-entrypoint-initdb.d/init.sh
     command: --server-id=2
     ports:
       - "3309:3306"
@@ -121,9 +125,11 @@ services:
       - mysql-master
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
     volumes:
       - ./config/mysql/slave.cnf:/etc/mysql/conf.d/config.cnf
       - mysql_slave2_data:/var/lib/mysql
+      - ./scripts/init-mysql-slave.sh:/docker-entrypoint-initdb.d/init.sh
     command: --server-id=3
     ports:
       - "3310:3306"
@@ -137,6 +143,9 @@ services:
     build: ./backend
     container_name: monitoring-backend
     restart: unless-stopped
+    environment:
+      - RUNNING_IN_DOCKER=true
+      - CHECK_INTERVAL=5000
     volumes:
       - ./backend:/app
       - /var/run/docker.sock:/var/run/docker.sock
@@ -147,20 +156,6 @@ services:
       - mysql-master
     networks:
       - db-cluster-net
-
-
-  # ---------------------------------------
-  # Frontend Dashboard
-  # ---------------------------------------
-#  frontend:
-#    build: ./frontend
-#    container_name: monitoring-frontend
-#    volumes:
-#      - ./frontend:/app
-#    ports:
-#      - "3000:3000"
-#    networks:
-#      - db-cluster-net
 
 networks:
   db-cluster-net:
