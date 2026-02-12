@@ -42,14 +42,22 @@ const MonitorService = {
                         nodeStatus.replication.connected_replicas = resRep.rows;
                     } else {
                         // Check Replication Status (seen from Replica)
-                        const resLag = await client.query('SELECT pg_is_in_recovery() as in_recovery, pg_last_wal_replay_lsn() as last_lsn');
-                        nodeStatus.replication.in_recovery = resLag.rows[0].in_recovery;
-                        nodeStatus.replication.last_lsn = resLag.rows[0].last_lsn;
+                        const resLsn = await client.query('SELECT pg_last_wal_receive_lsn() as receive_lsn, pg_last_wal_replay_lsn() as replay_lsn, pg_is_in_recovery() as in_recovery');
+                        const { receive_lsn, replay_lsn, in_recovery } = resLsn.rows[0];
 
-                        // Note: Precise seconds lag from replica side is hard without querying master time, 
-                        // effectively we use the master's view of lag (replay_lag) usually or `pg_last_xact_replay_timestamp()`.
-                        const resTime = await client.query("SELECT EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))::int as lag_seconds");
-                        nodeStatus.replication.lag_seconds = resTime.rows[0].lag_seconds;
+                        nodeStatus.replication.in_recovery = in_recovery;
+                        nodeStatus.replication.last_lsn = replay_lsn;
+
+                        // Robust Lag Calculation:
+                        // 1. If LSNs match, we are fully synced -> 0 lag.
+                        // 2. If calculated time lag is negative (clock skew), treat as 0.
+                        // 3. Otherwise use time difference.
+                        if (receive_lsn === replay_lsn) {
+                            nodeStatus.replication.lag_seconds = 0;
+                        } else {
+                            const resTime = await client.query("SELECT EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))::int as lag_seconds");
+                            nodeStatus.replication.lag_seconds = Math.max(0, resTime.rows[0].lag_seconds || 0);
+                        }
 
                         // Get real sync state from the replica itself
                         try {

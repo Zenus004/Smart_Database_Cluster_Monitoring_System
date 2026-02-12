@@ -41,6 +41,15 @@ const config = {
             user: POSTGRES_USER,
             password: POSTGRES_PASSWORD,
             database: POSTGRES_DB,
+        },
+        {
+            id: 'pg-replica-3',
+            role: 'replica',
+            host: isDocker ? 'postgres-replica-3' : 'localhost',
+            port: isDocker ? 5432 : 5435,
+            user: POSTGRES_USER,
+            password: POSTGRES_PASSWORD,
+            database: POSTGRES_DB,
         }
     ],
     mysql: [
@@ -67,6 +76,15 @@ const config = {
             role: 'replica',
             host: isDocker ? 'mysql-slave-2' : 'localhost',
             port: isDocker ? 3306 : 3308,
+            user: 'root',
+            password: MYSQL_ROOT_PASSWORD,
+            database: MYSQL_DATABASE,
+        },
+        {
+            id: 'mysql-slave-3',
+            role: 'replica',
+            host: isDocker ? 'mysql-slave-3' : 'localhost',
+            port: isDocker ? 3306 : 3309,
             user: 'root',
             password: MYSQL_ROOT_PASSWORD,
             database: MYSQL_DATABASE,
