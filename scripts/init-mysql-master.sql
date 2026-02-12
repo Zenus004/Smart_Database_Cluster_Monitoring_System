@@ -1,5 +1,5 @@
 -- Create replicator
-CREATE USER 'replicator'@'%' IDENTIFIED BY 'password123';
+CREATE USER IF NOT EXISTS 'replicator'@'%' IDENTIFIED WITH mysql_native_password BY 'password123';
 GRANT REPLICATION SLAVE ON *.* TO 'replicator'@'%';
 
 -- Update root to allow remote access
