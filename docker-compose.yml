@@ -1,6 +1,6 @@
 services:
   # ---------------------------------------
-  # PostgreSQL Cluster (Master + 2 Replicas)
+  # PostgreSQL Cluster (Master + 3 Replicas)
   # ---------------------------------------
   postgres-master:
     image: postgres:15-alpine
@@ -10,6 +10,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+      REPLICATOR_USER: ${REPLICATOR_USER}
+      REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD}
     volumes:
       - pg_master_data:/var/lib/postgresql/data
       - ./config/postgres/postgresql.conf:/etc/postgresql/postgresql.conf
@@ -32,6 +34,8 @@ services:
       - postgres-master
     environment:
       PGPASSWORD: ${REPLICATOR_PASSWORD}
+      REPLICATOR_USER: ${REPLICATOR_USER}
+      REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD}
     volumes:
       - ./config/postgres/replica.conf:/etc/postgresql/postgresql.conf
       - ./config/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
@@ -59,6 +63,8 @@ services:
       - postgres-master
     environment:
       PGPASSWORD: ${REPLICATOR_PASSWORD}
+      REPLICATOR_USER: ${REPLICATOR_USER}
+      REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD}
     volumes:
       - ./config/postgres/replica.conf:/etc/postgresql/postgresql.conf
       - ./config/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
@@ -76,9 +82,38 @@ services:
       - "5436:5432"
     networks:
       - db-cluster-net
+  
+  postgres-replica-3:
+    image: postgres:15-alpine
+    container_name: postgres-replica-3
+    user: postgres
+    restart: unless-stopped
+    depends_on:
+      - postgres-master
+    environment:
+      PGPASSWORD: ${REPLICATOR_PASSWORD}
+      REPLICATOR_USER: ${REPLICATOR_USER}
+      REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD}
+    volumes:
+      - ./config/postgres/replica.conf:/etc/postgresql/postgresql.conf
+      - ./config/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
+      - pg_replica3_data:/var/lib/postgresql/data
+    command: >
+      bash -c "
+      until pg_isready -h postgres-master -p 5432; do sleep 2; done &&
+      rm -rf /var/lib/postgresql/data/* &&
+      pg_basebackup -h postgres-master -D /var/lib/postgresql/data -U ${REPLICATOR_USER} -v -P -X stream -R &&
+      chown -R postgres:postgres /var/lib/postgresql/data &&
+      chmod 700 /var/lib/postgresql/data &&
+      postgres -c config_file=/etc/postgresql/postgresql.conf -c hba_file=/etc/postgresql/pg_hba.conf
+      "
+    ports:
+      - "5437:5432"
+    networks:
+      - db-cluster-net
 
   # ---------------------------------------
-  # MySQL Cluster (Master + 2 Slaves)
+  # MySQL Cluster (Master + 3 Slaves)
   # ---------------------------------------
   mysql-master:
     image: mysql:8.0
@@ -107,6 +142,8 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
+      REPLICATOR_USER: ${REPLICATOR_USER}
+      REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD}
     volumes:
       - ./config/mysql/slave.cnf:/etc/mysql/conf.d/config.cnf
       - mysql_slave1_data:/var/lib/mysql
@@ -126,6 +163,8 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
+      REPLICATOR_USER: ${REPLICATOR_USER}
+      REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD}
     volumes:
       - ./config/mysql/slave.cnf:/etc/mysql/conf.d/config.cnf
       - mysql_slave2_data:/var/lib/mysql
@@ -133,6 +172,27 @@ services:
     command: --server-id=3
     ports:
       - "3310:3306"
+    networks:
+      - db-cluster-net
+  
+  mysql-slave-3:
+    image: mysql:8.0
+    container_name: mysql-slave-3
+    restart: unless-stopped
+    depends_on:
+      - mysql-master
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      REPLICATOR_USER: ${REPLICATOR_USER}
+      REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD}
+    volumes:
+      - ./config/mysql/slave.cnf:/etc/mysql/conf.d/config.cnf
+      - mysql_slave3_data:/var/lib/mysql
+      - ./scripts/init-mysql-slave.sh:/docker-entrypoint-initdb.d/init.sh
+    command: --server-id=4
+    ports:
+      - "3311:3306"
     networks:
       - db-cluster-net
 
@@ -165,6 +225,8 @@ volumes:
   pg_master_data:
   pg_replica1_data:
   pg_replica2_data:
+  pg_replica3_data:
   mysql_master_data:
   mysql_slave1_data:
   mysql_slave2_data:
+  mysql_slave3_data:
