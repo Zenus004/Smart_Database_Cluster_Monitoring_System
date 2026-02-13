@@ -26,15 +26,24 @@ const getContainerStats = async (containerName) => {
             cpuPercent = (cpuDelta / systemDelta) * stats.cpu_stats.online_cpus * 100.0;
         }
 
-        // Calculate Memory Usage
-        const memoryUsage = stats.memory_stats.usage;
+        // Calculate Memory Usage (Usage - Cache to match Docker CLI/Dashboard)
+        let memoryUsage = stats.memory_stats.usage;
+        if (stats.memory_stats.stats) {
+            const cache = stats.memory_stats.stats.cache ||
+                stats.memory_stats.stats.inactive_file ||
+                stats.memory_stats.stats.total_inactive_file || 0;
+            memoryUsage = memoryUsage - cache;
+        }
+
         const memoryLimit = stats.memory_stats.limit;
         const memoryPercent = (memoryUsage / memoryLimit) * 100.0;
 
         return {
             status: 'running',
             cpu: parseFloat(cpuPercent.toFixed(2)),
+            cpuCores: stats.cpu_stats.online_cpus,
             memory: parseFloat((memoryUsage / 1024 / 1024).toFixed(2)), // MB
+            memoryLimit: parseFloat((memoryLimit / 1024 / 1024).toFixed(2)), // MB
             memoryPercent: parseFloat(memoryPercent.toFixed(2))
         };
     } catch (error) {

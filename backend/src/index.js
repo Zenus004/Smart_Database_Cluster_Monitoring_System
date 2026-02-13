@@ -87,7 +87,7 @@ server.listen(PORT, () => {
         } catch (err) {
             console.error('Monitoring Loop Error:', err.message);
         } finally {
-            setTimeout(runMonitoring, 5000);
+            setTimeout(runMonitoring, 2000);
         }
     };
 

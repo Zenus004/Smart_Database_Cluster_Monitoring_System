@@ -6,9 +6,7 @@ const MonitorService = {
     // PostgreSQL Monitoring
     // ----------------------------------
     async getPostgresClusterStatus() {
-        const results = [];
-
-        for (const node of config.postgres) {
+        const results = await Promise.all(config.postgres.map(async (node) => {
             const nodeStatus = {
                 id: node.id,
                 role: node.role,
@@ -98,8 +96,9 @@ const MonitorService = {
                 nodeStatus.error = err.message;
             }
 
-            results.push(nodeStatus);
-        }
+            return nodeStatus;
+        }));
+
         return results;
     },
 
@@ -107,9 +106,7 @@ const MonitorService = {
     // MySQL Monitoring
     // ----------------------------------
     async getMysqlClusterStatus() {
-        const results = [];
-
-        for (const node of config.mysql) {
+        const results = await Promise.all(config.mysql.map(async (node) => {
             const nodeStatus = {
                 id: node.id,
                 role: node.role,
@@ -180,8 +177,9 @@ const MonitorService = {
                 if (conn) await conn.end().catch(() => { });
             }
 
-            results.push(nodeStatus);
-        }
+            return nodeStatus;
+        }));
+
         return results;
     }
 };
