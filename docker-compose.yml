@@ -42,13 +42,17 @@ services:
       - pg_replica1_data:/var/lib/postgresql/data
     command: >
       bash -c "
-      until pg_isready -h postgres-master -p 5432; do sleep 2; done &&
+      echo 'Waiting for valid connection as ${REPLICATOR_USER}...' &&
+      until PGPASSWORD='${REPLICATOR_PASSWORD}' psql -h postgres-master -U ${REPLICATOR_USER} -d postgres -c 'SELECT 1' > /dev/null 2>&1; do
+        echo 'Master not ready or user not created yet. Retrying...'
+        sleep 2
+      done &&
+      echo 'Master is ready! Starting base backup...' &&
       rm -rf /var/lib/postgresql/data/* &&
       pg_basebackup -h postgres-master -D /var/lib/postgresql/data -U ${REPLICATOR_USER} -v -P -X stream -R &&
       chown -R postgres:postgres /var/lib/postgresql/data &&
       chmod 700 /var/lib/postgresql/data &&
-      postgres -c config_file=/etc/postgresql/postgresql.conf -c hba_file=/etc/postgresql/pg_hba.conf
-      "
+      postgres -c config_file=/etc/postgresql/postgresql.conf -c hba_file=/etc/postgresql/pg_hba.conf"
     ports:
       - "5435:5432"
     networks:
@@ -71,13 +75,17 @@ services:
       - pg_replica2_data:/var/lib/postgresql/data
     command: >
       bash -c "
-      until pg_isready -h postgres-master -p 5432; do sleep 2; done &&
+      echo 'Waiting for valid connection as ${REPLICATOR_USER}...' &&
+      until PGPASSWORD='${REPLICATOR_PASSWORD}' psql -h postgres-master -U ${REPLICATOR_USER} -d postgres -c 'SELECT 1' > /dev/null 2>&1; do
+        echo 'Master not ready or user not created yet. Retrying...'
+        sleep 2
+      done &&
+      echo 'Master is ready! Starting base backup...' &&
       rm -rf /var/lib/postgresql/data/* &&
       pg_basebackup -h postgres-master -D /var/lib/postgresql/data -U ${REPLICATOR_USER} -v -P -X stream -R &&
       chown -R postgres:postgres /var/lib/postgresql/data &&
       chmod 700 /var/lib/postgresql/data &&
-      postgres -c config_file=/etc/postgresql/postgresql.conf -c hba_file=/etc/postgresql/pg_hba.conf
-      "
+      postgres -c config_file=/etc/postgresql/postgresql.conf -c hba_file=/etc/postgresql/pg_hba.conf"
     ports:
       - "5436:5432"
     networks:
@@ -100,13 +108,17 @@ services:
       - pg_replica3_data:/var/lib/postgresql/data
     command: >
       bash -c "
-      until pg_isready -h postgres-master -p 5432; do sleep 2; done &&
+      echo 'Waiting for valid connection as ${REPLICATOR_USER}...' &&
+      until PGPASSWORD='${REPLICATOR_PASSWORD}' psql -h postgres-master -U ${REPLICATOR_USER} -d postgres -c 'SELECT 1' > /dev/null 2>&1; do
+        echo 'Master not ready or user not created yet. Retrying...'
+        sleep 2
+      done &&
+      echo 'Master is ready! Starting base backup...' &&
       rm -rf /var/lib/postgresql/data/* &&
       pg_basebackup -h postgres-master -D /var/lib/postgresql/data -U ${REPLICATOR_USER} -v -P -X stream -R &&
       chown -R postgres:postgres /var/lib/postgresql/data &&
       chmod 700 /var/lib/postgresql/data &&
-      postgres -c config_file=/etc/postgresql/postgresql.conf -c hba_file=/etc/postgresql/pg_hba.conf
-      "
+      postgres -c config_file=/etc/postgresql/postgresql.conf -c hba_file=/etc/postgresql/pg_hba.conf"
     ports:
       - "5437:5432"
     networks:
