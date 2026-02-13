@@ -11,7 +11,7 @@ const MetricCard = ({ title, value, subValue, icon: Icon, status, className }) =
 
     return (
         <div className={cn(
-            "group relative bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-[1.03] hover:border-slate-600/50 overflow-hidden animate-card-enter",
+            "group relative bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur-md rounded-2xl p-6 border border-slate-700/50 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-[1.03] hover:border-slate-600/50 overflow-hidden animate-card-enter",
             glowStatus,
             className
         )}>
