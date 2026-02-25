@@ -137,9 +137,15 @@ services:
       REPLICATOR_USER: ${REPLICATOR_USER}
       REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD}
     volumes:
-      - ./config/mysql/master.cnf:/etc/mysql/conf.d/config.cnf
       - mysql_master_data:/var/lib/mysql
       - ./scripts/init-mysql-master.sql:/docker-entrypoint-initdb.d/init.sql
+    command: >
+      mysqld
+      --server-id=1
+      --log-bin=mysql-bin
+      --binlog-format=row
+      --gtid-mode=ON
+      --enforce-gtid-consistency=ON
     ports:
       - "${MYSQL_PORT}:3306"
     networks:
@@ -157,10 +163,17 @@ services:
       REPLICATOR_USER: ${REPLICATOR_USER}
       REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD}
     volumes:
-      - ./config/mysql/slave.cnf:/etc/mysql/conf.d/config.cnf
       - mysql_slave1_data:/var/lib/mysql
       - ./scripts/init-mysql-slave.sh:/docker-entrypoint-initdb.d/init.sh
-    command: --server-id=2
+    command: >
+      mysqld
+      --server-id=2
+      --relay-log=mysql-relay-bin
+      --log-bin=mysql-bin
+      --binlog-format=row
+      --read-only=1
+      --gtid-mode=ON
+      --enforce-gtid-consistency=ON
     ports:
       - "3309:3306"
     networks:
@@ -178,10 +191,17 @@ services:
       REPLICATOR_USER: ${REPLICATOR_USER}
       REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD}
     volumes:
-      - ./config/mysql/slave.cnf:/etc/mysql/conf.d/config.cnf
       - mysql_slave2_data:/var/lib/mysql
       - ./scripts/init-mysql-slave.sh:/docker-entrypoint-initdb.d/init.sh
-    command: --server-id=3
+    command: >
+      mysqld
+      --server-id=3
+      --relay-log=mysql-relay-bin
+      --log-bin=mysql-bin
+      --binlog-format=row
+      --read-only=1
+      --gtid-mode=ON
+      --enforce-gtid-consistency=ON
     ports:
       - "3310:3306"
     networks:
@@ -199,10 +219,17 @@ services:
       REPLICATOR_USER: ${REPLICATOR_USER}
       REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD}
     volumes:
-      - ./config/mysql/slave.cnf:/etc/mysql/conf.d/config.cnf
       - mysql_slave3_data:/var/lib/mysql
       - ./scripts/init-mysql-slave.sh:/docker-entrypoint-initdb.d/init.sh
-    command: --server-id=4
+    command: >
+      mysqld
+      --server-id=4
+      --relay-log=mysql-relay-bin
+      --log-bin=mysql-bin
+      --binlog-format=row
+      --read-only=1
+      --gtid-mode=ON
+      --enforce-gtid-consistency=ON
     ports:
       - "3311:3306"
     networks:
