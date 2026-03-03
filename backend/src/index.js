@@ -52,14 +52,12 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 const PORT = process.env.BACKEND_PORT || 4000;
+const CHECK_INTERVAL = Math.max(1000, Number(process.env.CHECK_INTERVAL || 2000));
 
 server.listen(PORT, () => {
     console.log(`Backend Server running on port ${PORT}`);
 
-    // Start Background Monitoring Loop
-    console.log('Starting monitoring loop...');
-    // Start Background Monitoring Loop
-    console.log('Starting monitoring loop...');
+    console.log(`Starting monitoring loop (interval: ${CHECK_INTERVAL}ms)...`);
 
     const runMonitoring = async () => {
         try {
@@ -87,7 +85,7 @@ server.listen(PORT, () => {
         } catch (err) {
             console.error('Monitoring Loop Error:', err.message);
         } finally {
-            setTimeout(runMonitoring, 2000);
+            setTimeout(runMonitoring, CHECK_INTERVAL);
         }
     };
 
