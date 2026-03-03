@@ -1,149 +1,290 @@
 # Smart Database Cluster Monitoring System
 
-A production-grade, full-stack observability platform designed to monitor, visualize, and manage heterogeneous database clusters (PostgreSQL and MySQL).
+A full-stack monitoring dashboard for **PostgreSQL** and **MySQL** clusters, with real-time topology/metrics, replication lag visibility, alerting, and container-level admin controls for failure simulation.
 
-## 🚀 Features
+## ✨ Features
 
-*   **Real-Time Monitoring**: Live visualization of CPU, Memory, Active Connections, and Query Load for every node.
-*   **Heterogeneous Support**: Unified interface for both **PostgreSQL** (Streaming Replication) and **MySQL** (Binlog Replication).
-*   **Cluster Topology**: Now supports **Master + 3 Replicas** for both SQL flavors, visualizing the entire replication chain.
-*   **Precision Lag Tracking**: 
-    *   **PostgreSQL**: Uses LSN difference & time lag, handling idle connection edge cases.
-    *   **MySQL**: Tracks `Seconds_Behind_Master` and IO/SQL thread status.
-*   **Chaos Engineering**: Built-in **Admin Controls** to simulate node failures (stop/start containers) and verify self-healing resilience.
-*   **Event-Driven Alerts**: Intelligent alert engine with state tracking (Node Down, High Load, Recovery) and deduplication.
+- Real-time monitoring of:
+  - CPU
+  - Memory
+  - Active connections
+  - Replication lag
+  - Query load
+- Unified dashboard for:
+  - PostgreSQL (1 master + replicas)
+  - MySQL (1 master + slaves)
+- Precision Lag Tracking: 
+    -   PostgreSQL: Uses LSN difference & time lag, handling idle connection edge cases.
+    -   MySQL: Tracks `Seconds_Behind_Master` and IO/SQL thread status.
+- Event/alert stream for degraded/down/recovered nodes
+- Admin controls to stop/start/restart cluster containers
 
 ## 🛠️ Tech Stack
 
-*   **Frontend**: React (Vite), TailwindCSS, Recharts, Lucide Icons
-*   **Backend**: Node.js, Express, Socket.io, `pg` and `mysql2` drivers
-*   **Infrastructure**: Docker, Docker Compose
-*   **Communication**: REST API + WebSockets for real-time updates
+- **Frontend:** React + Vite + TailwindCSS + Recharts
+- **Backend:** Node.js + Express + Socket.IO + `pg` + `mysql2`
+- **Infrastructure:** Docker + Docker Compose
+- **Communication**: REST API + WebSockets for real-time updates
 
-## 🔧 Service & Port Reference
+## 📁 Repository Structure
 
-| Service | Host Port | Internal Port | Description |
-| :--- | :--- | :--- | :--- |
-| **Frontend** | `5173` | `5173` | React Dashboard |
-| **Backend API** | `4000` | `4000` | Node.js Express API |
-| **Postgres Master** | `5432` | `5432` | Primary R/W Node |
-| **Postgres Replicas** | `5435-5437` | `5432` | Read-Only Replicas (1-3) |
-| **MySQL Master** | `3306` | `3306` | Primary R/W Node |
-| **MySQL Slaves** | `3309-3311` | `3306` | Read-Only Slaves (1-3) |
+- `backend/` – API server, monitoring loop, alert logic
+- `frontend/` – dashboard UI
+- `config/` – PostgreSQL/MySQL config files used by containers
+- `scripts/` – DB initialization/replication bootstrap scripts
+- `docker-compose.yml` – full multi-container stack definition
+- `env.example` – environment variables template
 
-## 📦 Getting Started
+## 🔌 Service Ports (Default)
 
-### Prerequisites
-*   Docker Desktop (Running)
-*   Node.js v16+ (for local frontend dev)
+| Service | Host Port | Notes |
+|---|---:|---|
+| Frontend (Vite) | `5173` | Local dev server |
+| Backend API | `4000` | Express + Socket.IO |
+| PostgreSQL Master | `5432` | Primary node |
+| PostgreSQL Replicas | `5435`, `5436`, `5437` | Read replicas |
+| MySQL Master | `3308` | Primary node |
+| MySQL Slaves | `3309`, `3310`, `3311` | Read replicas |
 
-### Installation
+> `3308` is the default MySQL master port from `env.example`.
 
-1.  **Clone the Repository**
-    ```bash
-    git clone https://github.com/Zenus004/Smart_Database_Cluster_Monitoring_System.git
-    cd Smart_Database_Cluster_Monitoring_System
-    ```
+## ⚙️ Environment Variables
 
-2.  **Configure Environment**
-    Create a `.env` file in the root if it doesn't exist (see `env.example` or use defaults in `docker-compose.yml`).
-    **Critical Variables:**
-    *   `POSTGRES_USER` / `POSTGRES_PASSWORD`
-    *   `MYSQL_ROOT_PASSWORD`
-    *   `REPLICATOR_USER` / `REPLICATOR_PASSWORD` (Used for internal replication auth)
+Create `.env` in project root (or copy from `env.example`):
 
-3.  **Start Infrastructure (Backend + Databases)**
-    ```bash
-    docker-compose up -d --build
-    ```
-    *Wait ~30 seconds for databases to initialize.*
+```bash
+# PostgreSQL
+POSTGRES_USER=admin
+POSTGRES_PASSWORD=password123
+POSTGRES_DB=monitoring_db
 
-4.  **Start Frontend**
-    ```bash
-    cd frontend
-    npm install
-    npm run dev
-    ```
+# MySQL
+MYSQL_ROOT_PASSWORD=password123
+MYSQL_DATABASE=monitoring_db
 
-5.  **Access Dashboard**
-    *   Open [http://localhost:5173](http://localhost:5173) in your browser.
+# Replication
+REPLICATOR_USER=replicator
+REPLICATOR_PASSWORD=password123
+POSTGRES_REPLICA_COUNT=3
+MYSQL_REPLICA_COUNT=3
 
-## ⚠️ Troubleshooting & Maintenance
+# Ports
+POSTGRES_PORT=5432
+MYSQL_PORT=3308
+BACKEND_PORT=4000
+```
 
-### 1. Slaves/Replicas Not Connecting?
-If you see "Connecting" status or Auth errors in the logs, it likely means the Master data volume has an old user configuration that doesn't match your current `.env`.
-**Fix:** You must wipe the volumes to let the initialization scripts run again:
+## 🚀 Getting Started
+
+### ✅ Prerequisites
+
+- Docker Desktop
+- Node.js 18+ (recommended for frontend local dev)
+
+### 🐳 Option A: Run with Docker (Recommended)
+
+From project root:
+
+```bash
+docker-compose up -d --build
+```
+
+Then start frontend locally:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open: [http://localhost:5173](http://localhost:5173)
+
+### 💻 Option B: Backend + Frontend Locally (DBs in Docker)
+
+1. Start DB containers only with compose (or full stack).
+2. Run backend:
+
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+3. Run frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend uses Vite proxy (`/api` → `http://127.0.0.1:4000`).
+
+## 📡 API Endpoints
+
+### ❤️ Health
+
+- `GET /api/health`
+
+### 📊 Monitoring
+
+- `GET /api/monitor/status` – current cluster status snapshot
+
+### 🚨 Alerts
+
+- `GET /api/alerts` – alert history/events
+
+### 🧰 Admin Controls
+
+- `POST /api/admin/stop`
+- `POST /api/admin/start`
+- `POST /api/admin/restart`
+
+Request body:
+
+```json
+{ "name": "postgres-replica-1" }
+```
+
+### 🔐 Auth
+
+- `POST /api/auth/login`
+
+Request body:
+
+```json
+{ "username": "admin", "password": "admin123" }
+```
+
+## 🔄 Socket Events
+
+Backend emits:
+
+- `cluster_update` – latest full cluster payload
+- `new_alerts` – newly detected alerts
+
+## 🩺 Troubleshooting
+
+### Replicas/slaves stuck in connecting state
+
+Reinitialize volumes and bootstrap scripts:
+
 ```bash
 docker-compose down -v
 docker-compose up -d --build
 ```
-*(The `-v` flag removes the named volumes, forcing a fresh database init).*
 
-### 2. High Replication Lag on Idle Postgres?
+### Backend cannot reach Docker daemon
+
+The backend container mounts Docker socket (`/var/run/docker.sock`) for admin operations. Ensure Docker Desktop is running and socket access is available.
+
+### Vite proxy errors
+
+Verify backend is available on `http://127.0.0.1:4000` and no local firewall rule is blocking requests.
+
+### High Replication Lag on Idle Postgres?
 We have implemented a fix for this by comparing LSNs (Log Sequence Numbers). If the LSNs match, lag is forced to 0s, preventing false alarms during idle periods.
 
-### 3. "WAL Removed" Error?
+### "WAL Removed" Error?
 If a PostgreSQL replica fails to start with "requested WAL segment ... has already been removed":
-*   The Master has rotated its logs before the replica could grab them.
-*   **Fix:** We have set `wal_keep_size = 128MB` in `postgresql.conf` to prevent this.
-*   **Manual Recovery:** If it persists, remove just that replica's container and volume:
+-   The Master has rotated its logs before the replica could grab them.
+-   Fix: We have set `wal_keep_size = 128MB` in `postgresql.conf` to prevent this.
+-   Manual Recovery: If it persists, remove just that replica's container and volume:
     ```bash
     docker rm -f postgres-replica-N
     docker volume rm smart_database_cluster_monitoring_system_pg_replicaN_data
     docker-compose up -d postgres-replica-N
     ```
 
-## 🎮 Usage Guide
+## 🧭 Usage Guide
 
-### 1. View Cluster Health
-Navigate to **Overview** to see the aggregate health of both clusters.
-*   **Green Check**: All nodes healthy.
-*   **Yellow/Red**: Degradation (High Lag, High CPU, or Down) detected.
-*   **Event History**: Scrollable log of recent alerts.
+### 1) 📈 Monitor overall health (Overview)
 
-### 2. Simulate Failures (Admin Controls)
-Test the alert system without CLI access:
-1.  Go to the **Admin Controls** page.
-2.  Find a node (e.g., `postgres-replica-1`).
-3.  Click the **Red Stop Button**.
-4.  Observe the dashboard:
-    *   Node turns Red in Topology.
-    *   Alert triggers on Overview.
-5.  Click **Green Start Button** to recover.
+Open the dashboard at `http://localhost:5173` and use the **Overview** page as the primary health view.
+
+- **Healthy state:** all nodes report normal metrics and replication lag is stable.
+- **Degraded state:** one or more nodes show high CPU/memory, lag spikes, or disconnects.
+- **Alerts timeline:** recent events are shown so you can track failure and recovery windows.
+
+### 2) 🗂️ Inspect cluster-specific pages
+
+- **Postgres page:** check master/replica topology and replica lag behavior.
+- **MySQL page:** verify master/slave replication and `Seconds_Behind_Master` trends.
+- Use these pages to isolate which node is causing an alert seen in Overview.
+
+### 3) 🧪 Simulate failures (Admin Controls)
+
+Use the **Admin Controls** page to trigger controlled failure/recovery tests:
+
+1. Select a node (for example, `postgres-replica-1` or `mysql-slave-1`).
+2. Click **Stop** to simulate a node outage.
+3. Confirm status changes in topology + alert feed.
+4. Click **Start** (or **Restart**) to recover the node.
+5. Verify alerts clear after the node is healthy again.
+
+### 4) 🔍 Quick API validation (optional)
+
+You can verify backend responses directly:
+
+```bash
+curl http://localhost:4000/api/health
+curl http://localhost:4000/api/monitor/status
+curl http://localhost:4000/api/alerts
+```
 
 ## 📈 Scaling the Cluster
 
-You can easily add more nodes (e.g., `postgres-replica-4` or `mysql-slave-4`).
+The backend discovers replicas dynamically from environment counts and expected service names.
 
-### 1. Update `docker-compose.yml`
-Copy an existing replica/slave service block and update:
--   **Service Name**: e.g., `postgres-replica-4`
--   **Environment**: Ensure `REPLICATOR_USER` and `REPLICATOR_PASSWORD` are included.
--   **Ports**: Increment the host port (e.g., `"5438:5432"`)
--   **MySQL Only**: Increment `--server-id` (e.g., `--server-id=5`)
+### 1) 🧮 Increase replica counts in `.env`
 
-### 2. Register in Backend
-Update `backend/src/config/db.js` to let the monitor know about the new node ID and connection details.
+```bash
+POSTGRES_REPLICA_COUNT=4
+MYSQL_REPLICA_COUNT=4
+```
 
-### 3. Restart
+### 2) 🧱 Add matching services in `docker-compose.yml`
+
+For each new node, copy an existing replica/slave service and increment values:
+
+- **PostgreSQL:**
+  - Service/container name must follow: `postgres-replica-N`
+  - Add a unique host port (example: `5438:5432` for replica 4)
+  - Keep replication environment vars present
+- **MySQL:**
+  - Service/container name must follow: `mysql-slave-N`
+  - Add a unique host port (example: `3312:3306` for slave 4)
+  - Increment `--server-id` (must be unique per MySQL node)
+
+### 3) ♻️ Recreate stack
+
 ```bash
 docker-compose up -d --build
 ```
 
-## 🔌 API Reference
+### 4) ✅ Verify nodes are detected
 
-### Monitor
-*   `GET /api/monitor/status` - Get full cluster topology and metrics (CPU, Memory, Lag, Connections).
+- Open UI pages and confirm the new nodes appear in topology.
+- Check `GET /api/monitor/status` to ensure new node IDs are included.
+- If nodes fail to initialize, re-run with fresh volumes:
 
-### Alerts
-*   `GET /api/alerts` - Get active alert history.
+```bash
+docker-compose down -v
+docker-compose up -d --build
+```
 
-### Admin Controls
-*   `POST /api/admin/stop` - Stop a container to simulate failure.
-    *   Body: `{ "name": "postgres-replica-1" }`
-*   `POST /api/admin/start` - Start a container.
-    *   Body: `{ "name": "postgres-replica-1" }`
-*   `POST /api/admin/restart` - Restart a container.
-    *   Body: `{ "name": "postgres-replica-1" }`
+## 🧾 Useful Commands
 
-##
+```bash
+# Start stack
+docker-compose up -d --build
+
+# Stop stack
+docker-compose stop
+
+# Stop and remove containers + volumes
+docker-compose down -v
+
+# View logs
+docker-compose logs -f
+```
