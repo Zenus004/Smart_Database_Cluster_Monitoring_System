@@ -27,4 +27,8 @@ export const restartContainer = async (name) => {
     return api.post('/admin/restart', { name });
 };
 
+export const provisionReplica = async (type) => {
+    return api.post('/admin/provision', { type });
+};
+
 export default api;

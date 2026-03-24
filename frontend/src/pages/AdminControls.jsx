@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { getClusterStatus, stopContainer, startContainer, restartContainer } from '../services/api';
-import { Activity, Power, RefreshCw, StopCircle, Shield } from 'lucide-react';
+import { getClusterStatus, stopContainer, startContainer, restartContainer, provisionReplica } from '../services/api';
+import { Activity, Power, RefreshCw, StopCircle, Shield, PlusCircle } from 'lucide-react';
 
 const AdminControls = () => {
     const [status, setStatus] = useState(null);
@@ -36,6 +36,21 @@ const AdminControls = () => {
         } finally {
             setLoading(false);
             setTimeout(() => setMsg(null), 5000);
+        }
+    };
+
+    const handleProvision = async (type) => {
+        setLoading(true);
+        setMsg(null);
+        try {
+            const res = await provisionReplica(type);
+            setMsg({ type: 'success', text: res.data.message });
+            await fetchStatus();
+        } catch (error) {
+            setMsg({ type: 'error', text: `Provisioning failed: ${error.response?.data?.error || error.message}` });
+        } finally {
+            setLoading(false);
+            // Don't auto-hide msg quickly so user has time to read the docker-compose instruction
         }
     };
 
@@ -83,22 +98,46 @@ const AdminControls = () => {
         <div className="space-y-8">
             {/* Enhanced Header */}
             <header className="animate-slide-in-down">
-                <div className="flex items-center gap-4 mb-4">
-                    <div className="relative p-4 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl border border-purple-500/40 shadow-lg group hover:scale-105 transition-transform duration-300">
-                        <Shield className="w-9 h-9 text-purple-400 relative z-10 group-hover:rotate-12 transition-transform duration-300"
-                            style={{ filter: 'drop-shadow(0 0 8px rgba(168, 85, 247, 0.6))' }} />
-                        <div className="absolute inset-0 bg-purple-500/30 blur-xl rounded-2xl animate-pulse"></div>
-                        <div className="absolute inset-0 bg-pink-500/20 blur-2xl rounded-2xl"
-                            style={{ animation: 'pulseRing 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}></div>
+                <div className="flex items-center justify-between gap-4 mb-4">
+                    <div className="flex items-center gap-4">
+                        <div className="relative p-4 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl border border-purple-500/40 shadow-lg group hover:scale-105 transition-transform duration-300">
+                            <Shield className="w-9 h-9 text-purple-400 relative z-10 group-hover:rotate-12 transition-transform duration-300"
+                                style={{ filter: 'drop-shadow(0 0 8px rgba(168, 85, 247, 0.6))' }} />
+                            <div className="absolute inset-0 bg-purple-500/30 blur-xl rounded-2xl animate-pulse"></div>
+                            <div className="absolute inset-0 bg-pink-500/20 blur-2xl rounded-2xl"
+                                style={{ animation: 'pulseRing 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}></div>
+                        </div>
+                        <div>
+                            <h2 className="text-4xl font-display font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-purple-500 tracking-tight"
+                                style={{ textShadow: '0 0 30px rgba(168, 85, 247, 0.3)' }}>
+                                Admin Controls
+                            </h2>
+                            <p className="text-slate-400 mt-1.5 font-tech tracking-wide">
+                                Manage database node lifecycle and availability
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <h2 className="text-4xl font-display font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-purple-500 tracking-tight"
-                            style={{ textShadow: '0 0 30px rgba(168, 85, 247, 0.3)' }}>
-                            Admin Controls
-                        </h2>
-                        <p className="text-slate-400 mt-1.5 font-tech tracking-wide">
-                            Manage database node lifecycle and availability
-                        </p>
+                    
+                    {/* Dynamic Provisioning Controls */}
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => handleProvision('postgres')}
+                            disabled={loading}
+                            className="group relative flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/20 hover:border-cyan-500/60 hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-cyan-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Provision new PostgreSQL Replica"
+                        >
+                            <PlusCircle className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+                            <span className="font-tech font-bold text-sm tracking-wide">Add Postgres</span>
+                        </button>
+                        <button
+                            onClick={() => handleProvision('mysql')}
+                            disabled={loading}
+                            className="group relative flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500/20 hover:border-orange-500/60 hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Provision new MySQL Slave"
+                        >
+                            <PlusCircle className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+                            <span className="font-tech font-bold text-sm tracking-wide">Add MySQL</span>
+                        </button>
                     </div>
                 </div>
                 <div className="h-px bg-gradient-to-r from-purple-500/50 via-pink-500/50 to-transparent animate-pulse"></div>

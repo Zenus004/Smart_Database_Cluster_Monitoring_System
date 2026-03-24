@@ -1,5 +1,8 @@
 FROM node:18-alpine
 
+# Install Docker CLI and Compose Plugin
+RUN apk add --no-cache docker-cli docker-cli-compose
+
 WORKDIR /app
 
 COPY package*.json ./

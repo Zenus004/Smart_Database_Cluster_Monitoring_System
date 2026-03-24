@@ -6,12 +6,12 @@ const POSTGRES_USER = process.env.POSTGRES_USER || 'admin';
 const POSTGRES_PASSWORD = process.env.POSTGRES_PASSWORD || 'password123';
 const POSTGRES_DB = process.env.POSTGRES_DB || 'monitoring_db';
 const POSTGRES_PORT = Number(process.env.POSTGRES_PORT || 5432);
-const POSTGRES_REPLICA_COUNT = Number(process.env.POSTGRES_REPLICA_COUNT || 3);
+const fs = require('fs');
+const path = require('path');
 
 const MYSQL_ROOT_PASSWORD = process.env.MYSQL_ROOT_PASSWORD || 'password123';
 const MYSQL_DATABASE = process.env.MYSQL_DATABASE || 'monitoring_db';
 const MYSQL_PORT = Number(process.env.MYSQL_PORT || 3308);
-const MYSQL_REPLICA_COUNT = Number(process.env.MYSQL_REPLICA_COUNT || 3);
 
 const isDocker = process.env.RUNNING_IN_DOCKER === 'true';
 
@@ -49,8 +49,23 @@ const generateMysqlReplicas = (count) => {
     return replicas;
 };
 
-const config = {
-    postgres: [
+// Read dynamic topology
+const getTopology = () => {
+    try {
+        const data = fs.readFileSync(path.join(__dirname, 'topology.json'), 'utf8');
+        return JSON.parse(data);
+    } catch (err) {
+        console.warn('Could not read topology.json, defaulting to 3 replicas', err.message);
+        return { postgres: { replicaCount: 3 }, mysql: { replicaCount: 3 } };
+    }
+};
+
+let config = {};
+
+const reloadConfig = () => {
+    const topology = getTopology();
+    
+    config.postgres = [
         {
             id: 'pg-master',
             role: 'primary',
@@ -60,9 +75,10 @@ const config = {
             password: POSTGRES_PASSWORD,
             database: POSTGRES_DB,
         },
-        ...generatePostgresReplicas(POSTGRES_REPLICA_COUNT)
-    ],
-    mysql: [
+        ...generatePostgresReplicas(topology.postgres.replicaCount)
+    ];
+
+    config.mysql = [
         {
             id: 'mysql-master',
             role: 'primary',
@@ -72,9 +88,12 @@ const config = {
             password: MYSQL_ROOT_PASSWORD,
             database: MYSQL_DATABASE,
         },
-        ...generateMysqlReplicas(MYSQL_REPLICA_COUNT)
-    ]
+        ...generateMysqlReplicas(topology.mysql.replicaCount)
+    ];
 };
+
+// Initial load
+reloadConfig();
 
 // Connection Pools Cache
 const pgPools = {};
@@ -113,4 +132,4 @@ const getMysqlConnection = async (nodeId) => {
     });
 };
 
-module.exports = { config, getPgPool, getMysqlConnection };
+module.exports = { config, getPgPool, getMysqlConnection, reloadConfig, getTopology };
