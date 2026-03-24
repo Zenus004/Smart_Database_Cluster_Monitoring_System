@@ -298,14 +298,18 @@ const PostgresCluster = () => {
                                                     <span className='font-tech font-bold text-slate-200 tracking-wide'>Sync State</span>
                                                 </div>
                                                 <span className={`px-2.5 py-1 rounded-lg text-[10px] uppercase font-tech font-extrabold border ${replica.replication?.state === 'streaming'
-                                                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
-                                                    : 'bg-slate-700/50 text-slate-400 border-slate-600/50'
+                                                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' // Green for Streaming
+                                                    : !replica.replication?.state
+                                                    ? 'bg-red-500/20 text-red-500 border-red-500/40' // Red for Missing/Disconnected
+                                                    : 'bg-slate-700/50 text-slate-400 border-slate-600/50' // Gray for other states like waiting
                                                     }`} style={{
                                                         boxShadow: replica.replication?.state === 'streaming'
                                                             ? '0 0 10px rgba(16, 185, 129, 0.3)'
-                                                            : 'none'
+                                                            : !replica.replication?.state
+                                                                ? '0 0 10px rgba(239, 68, 68, 0.3)'
+                                                                : 'none'
                                                     }}>
-                                                    {replica.replication?.state || 'Async'}
+                                                    {replica.replication?.state || 'DISCONNECTED'}
                                                 </span>
                                             </div>
 
