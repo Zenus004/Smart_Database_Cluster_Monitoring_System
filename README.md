@@ -13,11 +13,12 @@ A full-stack monitoring dashboard for **PostgreSQL** and **MySQL** clusters, wit
 - Unified dashboard for:
   - PostgreSQL (1 master + replicas)
   - MySQL (1 master + slaves)
+- **Dynamic Scaling**: Add or Remove PostgreSQL replicas and MySQL slaves directly from the UI without manual config edits.
 - Precision Lag Tracking: 
     -   PostgreSQL: Uses LSN difference & time lag, handling idle connection edge cases.
     -   MySQL: Tracks `Seconds_Behind_Master` and IO/SQL thread status.
 - Event/alert stream for degraded/down/recovered nodes
-- Admin controls to stop/start/restart cluster containers
+- Admin controls to stop/start/restart cluster containers with premium custom modals.
 
 ## 🛠️ Tech Stack
 
@@ -139,6 +140,8 @@ Frontend uses Vite proxy (`/api` → `http://127.0.0.1:4000`).
 - `POST /api/admin/stop`
 - `POST /api/admin/start`
 - `POST /api/admin/restart`
+- `POST /api/admin/provision` – add a new replica/slave (`{ "type": "postgres" }`)
+- `POST /api/admin/deprovision` – remove the last replica/slave (`{ "type": "mysql" }`)
 
 Request body:
 
@@ -234,44 +237,25 @@ curl http://localhost:4000/api/alerts
 
 ## 📈 Scaling the Cluster
 
-The backend discovers replicas dynamically from environment counts and expected service names.
+Scaling is now fully automated and can be managed via the **Admin Controls** dashboard.
 
-### 1) 🧮 Increase replica counts in `.env`
+### 🚀 Automatic Scaling (Recommended)
 
-```bash
-POSTGRES_REPLICA_COUNT=4
-MYSQL_REPLICA_COUNT=4
-```
+1.  Navigate to the **Admin Controls** page in the dashboard.
+2.  Locate the **Postgres** or **MySQL** provisioning headers.
+3.  Click **[+] Add** to instantly provision a new node. 
+    - The system updates `topology.json`, modifies `docker-compose.yml`, and boots the container automatically.
+4.  Click **[-] Remove** to safely de-provision the latest node.
+    - The system gracefully shuts down the container and cleans up the configuration files.
 
-### 2) 🧱 Add matching services in `docker-compose.yml`
+### 🛠️ Manual Scaling (Alternative)
 
-For each new node, copy an existing replica/slave service and increment values:
+If you prefer manual configuration, you can still scale the cluster by editing the source files:
 
-- **PostgreSQL:**
-  - Service/container name must follow: `postgres-replica-N`
-  - Add a unique host port (example: `5438:5432` for replica 4)
-  - Keep replication environment vars present
-- **MySQL:**
-  - Service/container name must follow: `mysql-slave-N`
-  - Add a unique host port (example: `3312:3306` for slave 4)
-  - Increment `--server-id` (must be unique per MySQL node)
-
-### 3) ♻️ Recreate stack
-
-```bash
-docker-compose up -d --build
-```
-
-### 4) ✅ Verify nodes are detected
-
-- Open UI pages and confirm the new nodes appear in topology.
-- Check `GET /api/monitor/status` to ensure new node IDs are included.
-- If nodes fail to initialize, re-run with fresh volumes:
-
-```bash
-docker-compose down -v
-docker-compose up -d --build
-```
+1.  **Update `.env`**: Change `POSTGRES_REPLICA_COUNT` or `MYSQL_REPLICA_COUNT`.
+2.  **Edit `docker-compose.yml`**: Copy an existing replica service, update the name (e.g., `postgres-replica-4`), unique port, and server-id (for MySQL).
+3.  **Update `topology.json`**: Ensure the `replicaCount` matches your new setup.
+4.  **Restart**: Run `docker-compose up -d --build`.
 
 ## 🧾 Useful Commands
 
