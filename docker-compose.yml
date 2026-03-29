@@ -239,67 +239,6 @@ services:
   # Backend API
   # ---------------------------------------
 
-  mysql-slave-4:
-    image: mysql:8.0
-    container_name: mysql-slave-4
-    restart: unless-stopped
-    depends_on:
-      - mysql-master
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      REPLICATOR_USER: ${REPLICATOR_USER}
-      REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD}
-    volumes:
-      - mysql_slave4_data:/var/lib/mysql
-      - ./scripts/init-mysql-slave.sh:/docker-entrypoint-initdb.d/init.sh
-    command: >
-      mysqld
-      --server-id=5
-      --relay-log=mysql-relay-bin
-      --log-bin=mysql-bin
-      --binlog-format=row
-      --read-only=1
-      --gtid-mode=ON
-      --enforce-gtid-consistency=ON
-    ports:
-      - "3312:3306"
-    networks:
-      - db-cluster-net
-
-
-  postgres-replica-4:
-    image: postgres:15-alpine
-    container_name: postgres-replica-4
-    user: postgres
-    restart: unless-stopped
-    depends_on:
-      - postgres-master
-    environment:
-      PGPASSWORD: ${REPLICATOR_PASSWORD}
-      REPLICATOR_USER: ${REPLICATOR_USER}
-      REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD}
-    volumes:
-      - ./config/postgres/replica.conf:/etc/postgresql/postgresql.conf
-      - ./config/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
-      - pg_replica4_data:/var/lib/postgresql/data
-    command: >
-      bash -c "
-      echo 'Waiting for valid connection as ${REPLICATOR_USER}...' &&
-      until PGPASSWORD='${REPLICATOR_PASSWORD}' psql -h postgres-master -U ${REPLICATOR_USER} -d postgres -c 'SELECT 1' > /dev/null 2>&1; do
-        echo 'Master not ready or user not created yet. Retrying...'
-        sleep 2
-      done &&
-      echo 'Master is ready! Starting base backup...' &&
-      rm -rf /var/lib/postgresql/data/* &&
-      pg_basebackup -h postgres-master -D /var/lib/postgresql/data -U ${REPLICATOR_USER} -v -P -X stream -R &&
-      chown -R postgres:postgres /var/lib/postgresql/data &&
-      chmod 700 /var/lib/postgresql/data &&
-      postgres -c config_file=/etc/postgresql/postgresql.conf -c hba_file=/etc/postgresql/pg_hba.conf"
-    ports:
-      - "5438:5432"
-    networks:
-      - db-cluster-net
 
   backend:
     build: ./backend
@@ -333,6 +272,3 @@ volumes:
   mysql_slave1_data:
   mysql_slave2_data:
   mysql_slave3_data:
-
-  mysql_slave4_data:
-  pg_replica4_data:

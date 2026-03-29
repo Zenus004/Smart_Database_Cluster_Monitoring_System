@@ -7,5 +7,6 @@ router.post('/stop', adminController.stopContainer);
 router.post('/start', adminController.startContainer);
 router.post('/restart', adminController.restartContainer);
 router.post('/provision', adminController.provisionReplica);
+router.post('/deprovision', adminController.deprovisionReplica);
 
 module.exports = router;

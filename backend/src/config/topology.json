@@ -1,8 +1,8 @@
 {
   "postgres": {
-    "replicaCount": 4
+    "replicaCount": 3
   },
   "mysql": {
-    "replicaCount": 4
+    "replicaCount": 3
   }
 }

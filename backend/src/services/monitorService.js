@@ -99,7 +99,8 @@ const MonitorService = {
             return nodeStatus;
         }));
 
-        return results;
+        // Filter out nodes that may have been deprovisioned during the async check
+        return results.filter(res => config.postgres.some(node => node.id === res.id));
     },
 
     // ----------------------------------
@@ -180,7 +181,8 @@ const MonitorService = {
             return nodeStatus;
         }));
 
-        return results;
+        // Filter out nodes that may have been deprovisioned during the async check
+        return results.filter(res => config.mysql.some(node => node.id === res.id));
     }
 };
 

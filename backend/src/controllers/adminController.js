@@ -50,9 +50,24 @@ const provisionReplica = async (req, res) => {
     }
 };
 
+const deprovisionReplica = async (req, res) => {
+    try {
+        const { type } = req.body;
+        if (!type || !['postgres', 'mysql'].includes(type)) {
+            return res.status(400).json({ error: 'Valid database type (postgres or mysql) is required' });
+        }
+
+        const result = await AdminService.deprovisionReplica(type);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 module.exports = {
     stopContainer,
     startContainer,
     restartContainer,
-    provisionReplica
+    provisionReplica,
+    deprovisionReplica
 };

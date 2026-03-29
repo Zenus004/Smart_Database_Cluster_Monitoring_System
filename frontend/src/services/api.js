@@ -31,4 +31,8 @@ export const provisionReplica = async (type) => {
     return api.post('/admin/provision', { type });
 };
 
+export const deprovisionReplica = async (type) => {
+    return api.post('/admin/deprovision', { type });
+};
+
 export default api;

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { getClusterStatus, stopContainer, startContainer, restartContainer, provisionReplica } from '../services/api';
-import { Activity, Power, RefreshCw, StopCircle, Shield, PlusCircle } from 'lucide-react';
+import { getClusterStatus, stopContainer, startContainer, restartContainer, provisionReplica, deprovisionReplica } from '../services/api';
+import { Activity, Power, RefreshCw, StopCircle, Shield, PlusCircle, MinusCircle, AlertTriangle } from 'lucide-react';
 
 const AdminControls = () => {
     const [status, setStatus] = useState(null);
     const [loading, setLoading] = useState(false);
     const [msg, setMsg] = useState(null);
+    const [confirmDialog, setConfirmDialog] = useState(null);
 
     const fetchStatus = async () => {
         try {
@@ -51,6 +52,32 @@ const AdminControls = () => {
         } finally {
             setLoading(false);
             // Don't auto-hide msg quickly so user has time to read the docker-compose instruction
+        }
+    };
+
+    const handleDeprovision = (type) => {
+        setConfirmDialog({
+            type,
+            title: `Remove ${type === 'postgres' ? 'Postgres Replica' : 'MySQL Slave'}`,
+            message: `Are you sure you want to completely remove the last ${type} replica? Its data volume will be preserved but the container will be deleted.`
+        });
+    };
+
+    const executeDeprovision = async () => {
+        if (!confirmDialog) return;
+        const { type } = confirmDialog;
+        setConfirmDialog(null);
+        
+        setLoading(true);
+        setMsg(null);
+        try {
+            const res = await deprovisionReplica(type);
+            setMsg({ type: 'success', text: res.data.message });
+            await fetchStatus();
+        } catch (error) {
+            setMsg({ type: 'error', text: `Deprovisioning failed: ${error.response?.data?.error || error.message}` });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -119,25 +146,50 @@ const AdminControls = () => {
                     </div>
                     
                     {/* Dynamic Provisioning Controls */}
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => handleProvision('postgres')}
-                            disabled={loading}
-                            className="group relative flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/20 hover:border-cyan-500/60 hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-cyan-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Provision new PostgreSQL Replica"
-                        >
-                            <PlusCircle className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
-                            <span className="font-tech font-bold text-sm tracking-wide">Add Postgres</span>
-                        </button>
-                        <button
-                            onClick={() => handleProvision('mysql')}
-                            disabled={loading}
-                            className="group relative flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500/20 hover:border-orange-500/60 hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Provision new MySQL Slave"
-                        >
-                            <PlusCircle className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
-                            <span className="font-tech font-bold text-sm tracking-wide">Add MySQL</span>
-                        </button>
+                    <div className="flex flex-col gap-3 items-end">
+                        <div className="flex items-center gap-2 bg-slate-800/50 p-1.5 rounded-xl border border-slate-700/50 shadow-sm">
+                            <span className="text-sm font-tech text-slate-400 px-3 w-24 tracking-wide font-semibold">Postgres</span>
+                            <button
+                                onClick={() => handleProvision('postgres')}
+                                disabled={loading}
+                                className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:scale-105 transition-all shadow hover:shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Add Postgres Replica"
+                            >
+                                <PlusCircle className="w-4 h-4" />
+                                <span className="font-tech text-xs font-bold">Add</span>
+                            </button>
+                            <button
+                                onClick={() => handleDeprovision('postgres')}
+                                disabled={loading || status?.postgres?.filter(n => n.role === 'replica').length === 0}
+                                className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:scale-105 transition-all shadow hover:shadow-red-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                                title="Remove Postgres Replica"
+                            >
+                                <MinusCircle className="w-4 h-4" />
+                                <span className="font-tech text-xs font-bold">Remove</span>
+                            </button>
+                        </div>
+
+                        <div className="flex items-center gap-2 bg-slate-800/50 p-1.5 rounded-xl border border-slate-700/50 shadow-sm">
+                            <span className="text-sm font-tech text-slate-400 px-3 w-24 tracking-wide font-semibold">MySQL</span>
+                            <button
+                                onClick={() => handleProvision('mysql')}
+                                disabled={loading}
+                                className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:scale-105 transition-all shadow hover:shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Add MySQL Slave"
+                            >
+                                <PlusCircle className="w-4 h-4" />
+                                <span className="font-tech text-xs font-bold">Add</span>
+                            </button>
+                            <button
+                                onClick={() => handleDeprovision('mysql')}
+                                disabled={loading || status?.mysql?.filter(n => n.role === 'replica').length === 0}
+                                className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:scale-105 transition-all shadow hover:shadow-red-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                                title="Remove MySQL Slave"
+                            >
+                                <MinusCircle className="w-4 h-4" />
+                                <span className="font-tech text-xs font-bold">Remove</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div className="h-px bg-gradient-to-r from-purple-500/50 via-pink-500/50 to-transparent animate-pulse"></div>
@@ -347,6 +399,56 @@ const AdminControls = () => {
                     100% { transform: scale(1.4); opacity: 0; }
                 }
             `}</style>
+            
+            {/* Confirmation Modal */}
+            {confirmDialog && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300" onClick={() => setConfirmDialog(null)}></div>
+                    <div className="relative bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700/50 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] w-full max-w-md overflow-hidden animate-scale-in">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 via-pink-500 to-red-500 bg-[length:200%_auto] animate-[shimmer_2s_linear_infinite]"></div>
+                        
+                        <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-red-500/5 blur-[80px] pointer-events-none"></div>
+                        <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full bg-pink-500/5 blur-[80px] pointer-events-none"></div>
+
+                        <div className="p-8 relative z-10">
+                            <div className="flex justify-center mb-6">
+                                <div className="relative group">
+                                    <div className="absolute inset-0 bg-red-500/20 rounded-full blur-xl group-hover:bg-red-500/30 transition-colors animate-pulse"></div>
+                                    <div className="relative p-5 bg-gradient-to-br from-red-500/10 to-pink-500/10 rounded-full border border-red-500/20 backdrop-blur-sm">
+                                        <AlertTriangle className="w-12 h-12 text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.6)]" />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <h3 className="text-2xl font-display font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-pink-400 text-center mb-3 tracking-tight">
+                                {confirmDialog.title}
+                            </h3>
+                            
+                            <p className="text-slate-300 text-center font-tech mb-8 leading-relaxed text-[15px]">
+                                {confirmDialog.message}
+                            </p>
+                            
+                            <div className="flex gap-4">
+                                <button
+                                    onClick={() => setConfirmDialog(null)}
+                                    className="flex-1 py-3 px-4 bg-slate-800/50 hover:bg-slate-700/50 text-slate-300 rounded-xl font-tech font-bold transition-all duration-300 border border-slate-600/50 hover:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-900 group"
+                                >
+                                    <span className="group-hover:text-white transition-colors">Cancel</span>
+                                </button>
+                                <button
+                                    onClick={executeDeprovision}
+                                    className="flex-1 py-3 px-4 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white rounded-xl font-tech font-extrabold transition-all duration-300 shadow-[0_0_20px_rgba(239,68,68,0.4)] hover:shadow-[0_0_30px_rgba(239,68,68,0.6)] hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-slate-900 overflow-hidden relative group"
+                                >
+                                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out"></div>
+                                    <span className="relative z-10 flex items-center justify-center gap-2 tracking-wide">
+                                        Remove Node
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

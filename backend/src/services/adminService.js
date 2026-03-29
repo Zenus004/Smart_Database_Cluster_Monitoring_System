@@ -151,9 +151,65 @@ const provisionReplica = async (type) => {
     };
 };
 
+const deprovisionReplica = async (type) => {
+    // type is 'postgres' or 'mysql'
+    const composePath = path.join('/project', 'docker-compose.yml');
+    const topologyPath = path.join(__dirname, '../config/topology.json');
+    const { getTopology, reloadConfig } = dbConfig;
+    const topology = getTopology();
+    
+    if (!topology[type]) {
+        throw new Error(`Invalid replica type: ${type}`);
+    }
+    
+    const currentCount = topology[type].replicaCount;
+    if (currentCount <= 1) {
+        throw new Error(`Cannot remove the last ${type} replica.`);
+    }
+    
+    // 1. First Update Topology State so monitoring drops it IMMEDIATELY
+    topology[type].replicaCount -= 1;
+    fs.writeFileSync(topologyPath, JSON.stringify(topology, null, 2));
+    reloadConfig();
+    
+    // Give monitor engine a brief moment to clear the loops
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // 2. Stop and remove the container silently
+    const containerName = type === 'postgres' ? `postgres-replica-${currentCount}` : `mysql-slave-${currentCount}`;
+    try {
+        const container = getContainer(containerName);
+        await container.stop().catch(() => {}); // Catch if already stopped
+        await container.remove().catch(() => {}); // Remove container
+    } catch (err) {
+        console.warn(`Could not remove container ${containerName}, it might not exist:`, err.message);
+    }
+    
+    // Read and edit Compose file
+    if (fs.existsSync(composePath)) {
+        let composeContent = fs.readFileSync(composePath, 'utf8');
+        
+        // Remove the service block: strictly match 2 spaces to ignore child keys like `    image:`
+        const serviceRegex = new RegExp(`\\n  ${containerName}:[\\s\\S]*?(?=\\n  [a-zA-Z0-9_-]+:|$)`, 'g');
+        composeContent = composeContent.replace(serviceRegex, '');
+
+        // Broad string removal for volume
+        const volumeName = type === 'postgres' ? `pg_replica${currentCount}_data:` : `mysql_slave${currentCount}_data:`;
+        composeContent = composeContent.replace(new RegExp(`\\n\\s*${volumeName}`, 'g'), '');
+        
+        fs.writeFileSync(composePath, composeContent);
+    }
+    
+    return { 
+        message: `${type} replica #${currentCount} removed successfully.`,
+        success: true
+    };
+};
+
 module.exports = {
     stopContainer,
     startContainer,
     restartContainer,
-    provisionReplica
+    provisionReplica,
+    deprovisionReplica
 };
