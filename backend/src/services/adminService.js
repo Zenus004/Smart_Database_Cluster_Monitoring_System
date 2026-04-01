@@ -135,12 +135,18 @@ const provisionReplica = async (type) => {
 `;
         }
         
-        // Append service definition before backend
-        composeContent = composeContent.replace('  backend:', newServiceBlock + '\n  backend:');
+        // Ensure we append before backend strictly
+        composeContent = composeContent.replace(/\n\s*backend:/, newServiceBlock + '\n  backend:');
         
-        // Append volume definition at the end
+        // Append volume definition safely under the volumes: section
         const volumeName = type === 'postgres' ? `pg_replica${newCount}_data:` : `mysql_slave${newCount}_data:`;
-        composeContent += `\n  ${volumeName}`;
+        if (composeContent.includes('\nvolumes:')) {
+            if (!composeContent.includes(`  ${volumeName}`)) {
+                composeContent = composeContent.replace('\nvolumes:', `\nvolumes:\n  ${volumeName}`);
+            }
+        } else {
+            composeContent += `\nvolumes:\n  ${volumeName}\n`;
+        }
         
         fs.writeFileSync(composePath, composeContent);
     }
@@ -179,10 +185,20 @@ const deprovisionReplica = async (type) => {
     const containerName = type === 'postgres' ? `postgres-replica-${currentCount}` : `mysql-slave-${currentCount}`;
     try {
         const container = getContainer(containerName);
+        console.log(`Stopping container ${containerName}...`);
         await container.stop().catch(() => {}); // Catch if already stopped
-        await container.remove().catch(() => {}); // Remove container
+        console.log(`Removing container ${containerName}...`);
+        await container.remove({ v: true }).catch(() => {}); // Remove container and anonymous volumes
+        
+        // Explicitly remove the named docker volume to wipe state entirely
+        const projectName = 'smart_database_cluster_monitoring_system';
+        const volBase = type === 'postgres' ? `pg_replica${currentCount}_data` : `mysql_slave${currentCount}_data`;
+        const namedVol = `${projectName}_${volBase}`;
+        console.log(`Attempting to wipe named volume: ${namedVol}`);
+        const volume = docker.getVolume(namedVol);
+        await volume.remove().catch((e) => console.log(`Volume removal skipped (perhaps not created): ${e.message}`));
     } catch (err) {
-        console.warn(`Could not remove container ${containerName}, it might not exist:`, err.message);
+        console.warn(`Could not completely remove container ${containerName}:`, err.message);
     }
     
     // Read and edit Compose file
@@ -193,9 +209,10 @@ const deprovisionReplica = async (type) => {
         const serviceRegex = new RegExp(`\\n  ${containerName}:[\\s\\S]*?(?=\\n  [a-zA-Z0-9_-]+:|$)`, 'g');
         composeContent = composeContent.replace(serviceRegex, '');
 
-        // Broad string removal for volume
+        // Remove the volume key perfectly
         const volumeName = type === 'postgres' ? `pg_replica${currentCount}_data:` : `mysql_slave${currentCount}_data:`;
-        composeContent = composeContent.replace(new RegExp(`\\n\\s*${volumeName}`, 'g'), '');
+        const volumeRegex = new RegExp(`\\n[ \\t]*${volumeName}[ \\t]*\\n*`, 'g');
+        composeContent = composeContent.replace(volumeRegex, '\n');
         
         fs.writeFileSync(composePath, composeContent);
     }

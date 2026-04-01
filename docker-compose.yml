@@ -238,8 +238,6 @@ services:
   # ---------------------------------------
   # Backend API
   # ---------------------------------------
-
-
   backend:
     build: ./backend
     container_name: monitoring-backend
